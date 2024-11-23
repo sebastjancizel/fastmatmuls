@@ -1,16 +1,17 @@
+#include <algorithm>
 #include <benchmark/benchmark.h>
+#include <random>
 #include <vector>
 
 #include "matrix.hpp"
 
-constexpr int rows = 1024;
-constexpr int columns = 1024;
-constexpr int inners = 1024;
+std::vector<float> initialize_random_vector(size_t size) {
+  static thread_local std::random_device rd;
+  static thread_local std::mt19937 gen(rd());
+  std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
 
-static constexpr std::vector<float> initialize_random_vector(int n) {
-  std::vector<float> result(rows * inners);
-  for (auto &val : result)
-    val = static_cast<float>(rand()) / RAND_MAX;
+  std::vector<float> result(size);
+  std::generate(result.begin(), result.end(), [&]() { return dis(gen); });
   return result;
 }
 
