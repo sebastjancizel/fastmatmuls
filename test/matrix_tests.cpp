@@ -5,7 +5,7 @@
 
 class MatrixMultiplicationTest : public ::testing::Test {
 protected:
-  void SetUp() override {
+  void SetUp() {
     // Initialize random number generator
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -22,9 +22,9 @@ protected:
     result_accelerate.assign(Rows * Columns, 0.0f);
   }
 
-  static constexpr int Rows = 4;
-  static constexpr int Columns = 3;
-  static constexpr int Inners = 2;
+  static constexpr int Rows = 512;
+  static constexpr int Columns = 128;
+  static constexpr int Inners = 157;
 
   std::vector<float> left{std::vector<float>(Rows * Inners)};
   std::vector<float> right{std::vector<float>(Inners * Columns)};
@@ -32,7 +32,6 @@ protected:
   std::vector<float> result_loop_order{std::vector<float>(Rows * Columns)};
   std::vector<float> result_accelerate{std::vector<float>(Rows * Columns)};
 
-  // Helper function to compare two float vectors with tolerance
   bool compareResults(const std::vector<float> &a, const std::vector<float> &b,
                       float tolerance = 1e-5f) {
     if (a.size() != b.size())
@@ -44,7 +43,6 @@ protected:
     return true;
   }
 
-  // Helper to print matrix for debugging
   void printMatrix(const std::vector<float> &matrix, int rows, int cols) {
     for (int i = 0; i < rows; ++i) {
       for (int j = 0; j < cols; ++j) {
@@ -57,16 +55,15 @@ protected:
 
 TEST_F(MatrixMultiplicationTest, CompareDifferentImplementations) {
   // Run all implementations
-  matmulImplNaive<Rows, Columns, Inners>(left.data(), right.data(),
-                                         result_naive.data());
+  matmulImplNaive(Rows, Columns, Inners, left.data(), right.data(),
+                  result_naive.data());
 
-  matmulImplLoopOrder<Rows, Columns, Inners>(left.data(), right.data(),
-                                             result_loop_order.data());
+  matmulImplLoopOrder(Rows, Columns, Inners, left.data(), right.data(),
+                      result_loop_order.data());
 
-  matmulImplAccelerate<Rows, Columns, Inners>(left.data(), right.data(),
-                                              result_accelerate.data());
+  matmulImplAccelerate(Rows, Columns, Inners, left.data(), right.data(),
+                       result_accelerate.data());
 
-  // Compare results
   ASSERT_TRUE(compareResults(result_naive, result_loop_order))
       << "Naive and Loop Order implementations produce different results";
 
@@ -105,8 +102,8 @@ TEST_F(MatrixMultiplicationTest, KnownValues) {
   std::vector<float> result(4, 0.0f);
 
   // Test all implementations with known values
-  matmulImplAccelerate<2, 2, 2>(known_left.data(), known_right.data(),
-                                result.data());
+  matmulImplAccelerate(2, 2, 2, known_left.data(), known_right.data(),
+                       result.data());
 
   ASSERT_TRUE(compareResults(result, expected))
       << "Accelerate implementation failed for known values";
@@ -120,8 +117,8 @@ TEST_F(MatrixMultiplicationTest, EdgeCases) {
   std::vector<float> result_1x1(1, 0.0f);
   std::vector<float> expected_1x1 = {6.0f};
 
-  matmulImplAccelerate<1, 1, 1>(left_1x1.data(), right_1x1.data(),
-                                result_1x1.data());
+  matmulImplAccelerate(1, 1, 1, left_1x1.data(), right_1x1.data(),
+                       result_1x1.data());
 
   ASSERT_TRUE(compareResults(result_1x1, expected_1x1))
       << "Failed 1x1 matrix multiplication";
