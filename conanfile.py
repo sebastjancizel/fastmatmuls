@@ -12,6 +12,7 @@ class MatmulConan(ConanFile):
     def requirements(self):
         self.requires("gtest/1.15.0")
         self.requires("benchmark/1.9.0")
+        self.requires("llvm-openmp/18.1.8")
 
     def build_requirements(self):
         self.build_requires("cmake/3.30.5")

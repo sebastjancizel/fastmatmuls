@@ -1,8 +1,32 @@
 #pragma once
 
 #include <Accelerate/Accelerate.h>
+#include <algorithm>
+#include <omp.h>
 
-// Concept
+/*
+ * The MatmulImplementation concept defines the requirements for any function that implements
+ * matrix multiplication. It ensures that any function satisfying this concept:
+ *
+ * 1. Takes exactly 6 parameters in the following order:
+ *    - rows: number of rows in the result matrix (and left matrix)
+ *    - cols: number of columns in the result matrix (and right matrix)
+ *    - inner: number of columns in left matrix (also rows in right matrix)
+ *    - left: pointer to the left matrix data (rows × inner)
+ *    - right: pointer to the right matrix data (inner × cols)
+ *    - result: pointer to store the resulting matrix (rows × cols)
+ *
+ * 2. Returns void (specified by std::same_as<void>)
+ *
+ * This concept is used to ensure type safety and consistent interfaces across different
+ * matrix multiplication implementations, allowing them to be used interchangeably
+ * while guaranteeing they follow the same parameter convention.
+ *
+ * In benchmarking, this concept enables generic benchmark templates that can test any
+ * compliant implementation. By using 'template <MatmulImplementation auto func>', we can
+ * create a single benchmark function that works with any matrix multiplication implementation
+ * that satisfies the concept.
+ */
 template <typename F>
 concept MatmulImplementation =
     requires(F f, int rows, int cols, int inner, const float *left,
@@ -27,6 +51,7 @@ inline void matmulImplNaive(int rows, int columns, int inners,
 inline void matmulImplLoopOrder(int rows, int columns, int inners,
                                 const float *left, const float *right,
                                 float *result) {
+  std::fill_n(result, rows * columns, 0.0f);
   for (int row = 0; row < rows; row++) {
     for (int inner = 0; inner < inners; inner++) {
       for (int column = 0; column < columns; column++) {
@@ -48,6 +73,7 @@ template <int TileSize>
 inline void matmulImplTiling(int rows, int columns, int inners,
                              const float *left, const float *right,
                              float *result) {
+  std::fill_n(result, rows * columns, 0.0f);
   for (int innerTile = 0; innerTile < inners; innerTile += TileSize) {
     for (int row = 0; row < rows; row++) {
       int innerTileEnd = std::min(inners, innerTile + TileSize);
@@ -61,8 +87,57 @@ inline void matmulImplTiling(int rows, int columns, int inners,
   }
 }
 
+template <int RowTileSize, int ColumnTileSize, int InnerTileSize>
+/*
+ * 3D tiling for matrix multiplication with OpenMP parallelization:
+ * - Tiles the output matrix into RowTileSize × ColumnTileSize blocks
+ * - For each output tile, processes the inner dimension in InnerTileSize chunks
+ *
+ * Parallelization strategy:
+ * 1. Parallel region spans rowTile and columnTile loops (collapse(2))
+ *    - Increases parallel granularity
+ *    - Better load balancing across threads
+ *    - Each thread processes multiple complete tiles
+ *
+ * 2. Data sharing:
+ *    - result/left/right arrays are shared between threads
+ *    - Loop indices and bounds are private by default
+ *    - default(none) ensures explicit declaration of all variables
+ *
+ * Cache optimization:
+ * - Row tiling ensures each thread works on a cache-friendly slice
+ * - Column tiling improves spatial locality in the output matrix
+ * - Inner dimension tiling reduces cache misses in matrix traversal
+ */
+inline void matmulImplTilingRowCol(int rows, int columns, int inners,
+                                  const float *left, const float *right,
+                                  float *result) {
+  std::fill_n(result, rows * columns, 0.0f);
+
+  #pragma omp parallel for shared(result, left, right, rows, columns, inners) default(none) collapse(2)
+  for (int rowTile = 0; rowTile < rows; rowTile += RowTileSize) {
+    for (int columnTile = 0; columnTile < columns; columnTile += ColumnTileSize) {
+      int rowTileEnd = std::min(rows, rowTile + RowTileSize);
+      int columnTileEnd = std::min(columns, columnTile + ColumnTileSize);
+      for (int innerTile = 0; innerTile < inners; innerTile += InnerTileSize) {
+        int innerTileEnd = std::min(inners, innerTile + InnerTileSize);
+        for (int row = rowTile; row < rowTileEnd; row++) {
+          for (int inner = innerTile; inner < innerTileEnd; inner++) {
+            for (int column = columnTile; column < columnTileEnd; column++) {
+              result[row * columns + column] +=
+                  left[row * inners + inner] * right[inner * columns + column];
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 // Verify at compile time that all implementations satisfy the concept
 static_assert(MatmulImplementation<decltype(matmulImplNaive)>);
 static_assert(MatmulImplementation<decltype(matmulImplLoopOrder)>);
 static_assert(MatmulImplementation<decltype(matmulImplAccelerate)>);
 static_assert(MatmulImplementation<decltype(matmulImplTiling<3>)>);
+static_assert(MatmulImplementation<decltype(matmulImplTilingRowCol<32, 32, 32>)>);
+

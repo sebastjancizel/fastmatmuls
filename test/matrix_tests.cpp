@@ -20,6 +20,7 @@ protected:
     result_naive.assign(Rows * Columns, 0.0f);
     result_loop_order.assign(Rows * Columns, 0.0f);
     result_accelerate.assign(Rows * Columns, 0.0f);
+    result_parallel_tiled.assign(Rows * Columns, 0.0f);
   }
 
   static constexpr int Rows = 512;
@@ -31,6 +32,7 @@ protected:
   std::vector<float> result_naive{std::vector<float>(Rows * Columns)};
   std::vector<float> result_loop_order{std::vector<float>(Rows * Columns)};
   std::vector<float> result_accelerate{std::vector<float>(Rows * Columns)};
+  std::vector<float> result_parallel_tiled{std::vector<float>(Rows * Columns)};
 
   bool compareResults(const std::vector<float> &a, const std::vector<float> &b,
                       float tolerance = 1e-5f) {
@@ -64,11 +66,17 @@ TEST_F(MatrixMultiplicationTest, CompareDifferentImplementations) {
   matmulImplAccelerate(Rows, Columns, Inners, left.data(), right.data(),
                        result_accelerate.data());
 
+  matmulImplTilingRowCol<32, 32, 32>(Rows, Columns, Inners, left.data(), right.data(),
+                                    result_parallel_tiled.data());
+
   ASSERT_TRUE(compareResults(result_naive, result_loop_order))
       << "Naive and Loop Order implementations produce different results";
 
   ASSERT_TRUE(compareResults(result_naive, result_accelerate))
       << "Naive and Accelerate implementations produce different results";
+
+  ASSERT_TRUE(compareResults(result_accelerate, result_parallel_tiled))
+      << "Accelerate and Parallel Tiled implementations produce different results";
 
   // If test fails, print matrices for debugging
   if (::testing::Test::HasFailure()) {
@@ -86,6 +94,9 @@ TEST_F(MatrixMultiplicationTest, CompareDifferentImplementations) {
 
     std::cout << "\nAccelerate Result:" << std::endl;
     printMatrix(result_accelerate, Rows, Columns);
+
+    std::cout << "\nParallel Tiled Result:" << std::endl;
+    printMatrix(result_parallel_tiled, Rows, Columns);
   }
 }
 
