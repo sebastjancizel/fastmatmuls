@@ -5,6 +5,7 @@ add_executable(
 target_link_libraries(
   matrix_test
   matrix_lib
+  GTest::gtest
   GTest::gtest_main
 )
 

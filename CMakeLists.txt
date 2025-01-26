@@ -18,8 +18,8 @@ enable_testing()
 
 # Find required packages
 find_package(OpenMP REQUIRED)
-find_package(GTest CONFIG REQUIRED)
-find_package(benchmark CONFIG REQUIRED)
+find_package(GTest REQUIRED)
+find_package(benchmark REQUIRED)
 
 # Base library
 add_library(matrix_lib INTERFACE)
@@ -28,8 +28,6 @@ target_include_directories(matrix_lib INTERFACE include)
 target_link_libraries(matrix_lib INTERFACE
     "-framework Accelerate"
     OpenMP::OpenMP_CXX
-    GTest::gtest
-    benchmark::benchmark
 )
 
 add_subdirectory(benchmark)
