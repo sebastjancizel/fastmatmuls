@@ -3,6 +3,7 @@
 #include <Accelerate/Accelerate.h>
 #include <algorithm>
 #include <omp.h>
+#include <arm_neon.h>  // Required for ARM NEON intrinsics
 
 /*
  * The MatmulImplementation concept defines the requirements for any function that implements
@@ -134,10 +135,54 @@ inline void matmulImplTilingRowCol(int rows, int columns, int inners,
   }
 }
 
+inline void matmulImplSimdBasic(int rows, int columns, int inners,
+                               const float *left, const float *right,
+                               float *result) {
+    std::fill_n(result, rows * columns, 0.0f);
+
+    // Process one row at a time
+    for (int row = 0; row < rows; row++) {
+        // For each element in the inner dimension
+        for (int inner = 0; inner < inners; inner++) {
+            // Load the left matrix element and duplicate it to all elements
+            // This creates a vector where all 4 elements are the same value
+            float left_val = left[row * inners + inner];
+            float32x4_t left_vec = vdupq_n_f32(left_val);
+
+            // Process 4 columns at a time using NEON SIMD
+            for (int col = 0; col < columns; col += 4) {
+                if (col + 4 <= columns) {
+                    // Load 4 elements from the right matrix
+                    float32x4_t right_vec = vld1q_f32(&right[inner * columns + col]);
+
+                    // Load current result values
+                    float32x4_t result_vec = vld1q_f32(&result[row * columns + col]);
+
+                    // Multiply and accumulate
+                    // This is equivalent to:
+                    // for (int i = 0; i < 4; i++)
+                    //     result[i] += left_val * right[i];
+                    result_vec = vfmaq_f32(result_vec, left_vec, right_vec);
+
+                    // Store back the results
+                    vst1q_f32(&result[row * columns + col], result_vec);
+                } else {
+                    // Handle remaining columns (less than 4) without SIMD
+                    for (int remainder = col; remainder < columns; remainder++) {
+                        result[row * columns + remainder] +=
+                            left_val * right[inner * columns + remainder];
+                    }
+                }
+            }
+        }
+    }
+}
+
 // Verify at compile time that all implementations satisfy the concept
 static_assert(MatmulImplementation<decltype(matmulImplNaive)>);
 static_assert(MatmulImplementation<decltype(matmulImplLoopOrder)>);
 static_assert(MatmulImplementation<decltype(matmulImplAccelerate)>);
 static_assert(MatmulImplementation<decltype(matmulImplTiling<3>)>);
 static_assert(MatmulImplementation<decltype(matmulImplTilingRowCol<32, 32, 32>)>);
+static_assert(MatmulImplementation<decltype(matmulImplSimdBasic)>);
 

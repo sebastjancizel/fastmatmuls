@@ -38,6 +38,7 @@ static void BM_Matmul(benchmark::State &state) {
 BENCHMARK(BM_Matmul<matmulImplAccelerate>)->Unit(benchmark::kMillisecond);
 BENCHMARK(BM_Matmul<matmulImplNaive>)->Unit(benchmark::kMillisecond);
 BENCHMARK(BM_Matmul<matmulImplLoopOrder>)->Unit(benchmark::kMillisecond);
+BENCHMARK(BM_Matmul<matmulImplSimdBasic>)->Unit(benchmark::kMillisecond);
 BENCHMARK(BM_Matmul<matmulImplTiling<8>>)->Unit(benchmark::kMillisecond);
 BENCHMARK(BM_Matmul<matmulImplTiling<16>>)->Unit(benchmark::kMillisecond);
 BENCHMARK(BM_Matmul<matmulImplTiling<18>>)->Unit(benchmark::kMillisecond);

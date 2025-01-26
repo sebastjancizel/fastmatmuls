@@ -12,7 +12,7 @@ list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR}/generators)
 project(matmul VERSION 0.1.0 LANGUAGES CXX)
 
 # Add optimization flags
-add_compile_options(-march=native -ffast-math)
+add_compile_options(-O3 -mcpu=apple-m2 -ffast-math)
 
 enable_testing()
 
